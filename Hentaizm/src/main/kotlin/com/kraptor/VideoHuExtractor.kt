@@ -129,6 +129,41 @@ open class VideoHu : ExtractorApi() {
             val doc = db.parse(xmlString.byteInputStream())
             val videoTags = doc.getElementsByTagName("video")
             if (videoTags.length == 0) {
+                // Check for error tag with redirect URL
+                val errorTags = doc.getElementsByTagName("error")
+                if (errorTags.length > 0) {
+                    val errorUrl = errorTags.item(0).textContent
+                    Log.d("kraptor_$name", "Error tag found with URL: $errorUrl, trying web scraping fallback")
+                    
+                    if (errorUrl.isNotEmpty() && errorUrl.startsWith("http")) {
+                        try {
+                            val pageHtml = app.get(errorUrl).text
+                            // Try to find video URL in page source (Videa usually keeps it in JSON config in script)
+                            // Look for "file": "https://..."
+                            val mp4Match = Regex("""\"file\"\s*:\s*\"(https?:.*?.mp4)\"""").find(pageHtml)
+                            if (mp4Match != null) {
+                                val videoUrl = mp4Match.groupValues[1].replace("\\/", "/")
+                                Log.d("kraptor_$name", "Found fallback video URL: $videoUrl")
+                                callback.invoke(
+                                    ExtractorLink(
+                                        name,
+                                        name,
+                                        videoUrl,
+                                        referer = errorUrl,
+                                        quality = Qualities.Unknown.value,
+                                        type = INFER_TYPE
+                                    )
+                                )
+                                return@withContext
+                            } else {
+                                Log.e("kraptor_$name", "No video URL found in fallback page")
+                            }
+                        } catch (e: Exception) {
+                            Log.e("kraptor_$name", "Error in fallback scraping: ${e.message}")
+                        }
+                    }
+                }
+
                 Log.e("kraptor_$name", "No video tag found in XML")
                 return@withContext
             }
