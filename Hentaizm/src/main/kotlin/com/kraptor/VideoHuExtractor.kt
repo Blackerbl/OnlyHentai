@@ -8,6 +8,7 @@ import javax.xml.parsers.DocumentBuilderFactory
 import android.util.Base64
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import com.lagradost.cloudstream3.app
 
 open class VideoHu : ExtractorApi() {
     override val name = "Videa"
