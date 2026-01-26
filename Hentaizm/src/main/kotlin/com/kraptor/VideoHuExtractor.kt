@@ -162,19 +162,16 @@ open class VideoHu : ExtractorApi() {
             val doc = db.parse(xmlString.byteInputStream())
             val videoTags = doc.getElementsByTagName("video")
             if (videoTags.length == 0) {
-                // Check for error tag with redirect URL using manual parsing (Most robust)
-                // XML format: <error status="0" url="" panelstyle="noembed">https://...</error>
-                val errorTagStart = xmlString.indexOf("<error")
-                val errorTagEnd = xmlString.indexOf("</error>")
+                // Check for error tag using substringAfter/Before (Cleaner & Debuggable)
+                Log.d("kraptor_$name", "Checking for error tag in XML of length ${xmlString.length}")
                 
-                if (errorTagStart != -1 && errorTagEnd != -1 && errorTagEnd > errorTagStart) {
-                     // Find the closing bracket of opening tag
-                     val openingTagEnd = xmlString.indexOf(">", errorTagStart)
-                     if (openingTagEnd != -1 && openingTagEnd < errorTagEnd) {
-                         val errorUrl = xmlString.substring(openingTagEnd + 1, errorTagEnd).trim()
-                         Log.d("kraptor_$name", "Error tag found via Stringop with URL: $errorUrl, trying web scraping fallback")
+                val errorPart = xmlString.substringAfter("<error", "")
+                if (errorPart.isNotEmpty() && errorPart != xmlString) {
+                     val errorUrl = errorPart.substringAfter(">", "").substringBefore("</error>", "").trim()
+                     Log.d("kraptor_$name", "Extracted potential error URL: '$errorUrl'")
 
-                         if (errorUrl.isNotEmpty() && errorUrl.startsWith("http")) {
+                     if (errorUrl.isNotEmpty() && errorUrl.startsWith("http")) {
+                         Log.d("kraptor_$name", "Valid error URL found, initiating fallback")
                         try {
                             val fbResp = httpGet(errorUrl)
                             val pageHtml = fbResp.text
