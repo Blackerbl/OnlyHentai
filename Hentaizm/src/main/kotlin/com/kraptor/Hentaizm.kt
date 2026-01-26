@@ -46,18 +46,23 @@ class Hentaizm : MainAPI() {
         return object : Interceptor {
             override fun intercept(chain: Interceptor.Chain): Response {
                 val request = chain.request()
-                val cookies = SessionManager.getCachedCookies()
+                val requestUrl = request.url.toString()
                 
-                val builder = request.newBuilder()
-                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-                    .header("Referer", mainUrl + "/")
+                // Only add headers if the request is for the main site
+                if (requestUrl.contains("hentaizm")) {
+                    val cookies = SessionManager.getCachedCookies()
+                    val builder = request.newBuilder()
+                        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                        .header("Referer", mainUrl + "/")
 
-                if (cookies.isNotEmpty()) {
-                    val cookieHeader = cookies.entries.joinToString("; ") { "${it.key}=${it.value}" }
-                    builder.header("Cookie", cookieHeader)
+                    if (cookies.isNotEmpty()) {
+                        val cookieHeader = cookies.entries.joinToString("; ") { "${it.key}=${it.value}" }
+                        builder.header("Cookie", cookieHeader)
+                    }
+                    return chain.proceed(builder.build())
                 }
 
-                return chain.proceed(builder.build())
+                return chain.proceed(request)
             }
         }
     }
