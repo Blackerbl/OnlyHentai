@@ -1,9 +1,9 @@
 {
-  "iconUrl": "https://raw.githubusercontent.com/Kraptor123/Cs-GizliKeyif/refs/heads/master/.github/logo/gizlikeyif.png",
-  "name": "Cs-GizliKeyif +18 | @kraptor123",
-  "description": "+18 Repo",
+  "iconUrl": null,
+  "name": "OnlyHentai | @Blackerbl",
+  "description": "Fixed Hentaizm Repo",
   "manifestVersion": 1,
   "pluginLists": [
-    "https://raw.githubusercontent.com/Kraptor123/Cs-GizliKeyif/refs/heads/builds/plugins.json"
+    "https://raw.githubusercontent.com/Blackerbl/OnlyHentai/builds/plugins.json"
   ]
 }
