@@ -1,4 +1,3 @@
-// ! Bu araç @Kraptor123 tarafından | @Cs-GizliKeyif için yazılmıştır.
 package com.kraptor
 
 import com.lagradost.api.Log
@@ -7,6 +6,8 @@ import com.lagradost.cloudstream3.utils.*
 import org.w3c.dom.*
 import javax.xml.parsers.DocumentBuilderFactory
 import android.util.Base64
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 open class VideoHu : ExtractorApi() {
     override val name = "Videa"
@@ -44,88 +45,111 @@ open class VideoHu : ExtractorApi() {
         referer: String?,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
-    ) {
-        Log.d("kraptor_$name", "Fetching URL: $url")
-        // Download initial page or player
-        val pageContent = app.get(url, referer = referer).text
+    ) = withContext(Dispatchers.IO) {
+        try {
+            Log.d("kraptor_$name", "Fetching URL: $url")
+            // Download initial page or player
+            val pageContent = app.get(url, referer = referer).text
 
-        // Determine player URL
-        val playerUrl = if (url.contains("videa.hu/player")) {
-            url
-        } else {
-            Regex("<iframe.*?src=\\\"(/player\\?[^\\\"]+)\\\"")
-                .find(pageContent)?.groupValues?.get(1)
-                ?.let { url.substringBefore("/videa.hu") + it } ?: url
-        }
-
-        // Download player page
-        val playerResp = app.get(playerUrl, referer = url)
-        val playerHtml = playerResp.text
-
-        // Extract nonce
-        val nonce = Regex("_xt\\s*=\\s*\\\"([^\\\"]+)\\\"")
-            .find(playerHtml)?.groupValues?.get(1)
-            ?: throw Error("Nonce not found")
-        val l = nonce.substring(0, 32)
-        val s = nonce.substring(32)
-        var result = ""
-        for (i in 0 until 32) {
-            val idx = STATIC_SECRET.indexOf(l[i])
-            result += s[i - (idx - 31)]
-        }
-
-        // Build query parameters
-        val randomSeed = (1..8).map { ('A'..'Z') + ('a'..'z') + ('0'..'9') }
-            .joinToString("") { it[randomSeedIndex()].toString() }
-        val tParam = result.substring(0, 16)
-        val query = mapOf(
-            "v" to url.substringAfterLast("v="),
-            "_s" to randomSeed,
-            "_t" to tParam
-        )
-
-        // Request XML info
-        val xmlResp = app.get("https://videa.hu/player/xml", referer = playerUrl, params = query)
-        val xmlBody = xmlResp.text
-
-        val xmlString = if (xmlBody.trimStart().startsWith("<?xml")) {
-            xmlBody
-        } else {
-            // Encrypted: base64 -> rc4
-            val b64 = Base64.decode(xmlBody, Base64.DEFAULT)
-            val key = result.substring(16) + randomSeed + xmlResp.headers["x-videa-xs"]
-            rc4(b64, key)
-        }
-
-        // Parse XML
-        val db = DocumentBuilderFactory.newInstance().newDocumentBuilder()
-        val doc = db.parse(xmlString.byteInputStream())
-        val video = doc.getElementsByTagName("video").item(0) as Element
-        val title = video.getElementsByTagName("title").item(0).textContent
-
-        val sources = doc.getElementsByTagName("video_source")
-        val hashValues = doc.getElementsByTagName("hash_values").item(0) as? Element
-
-        for (i in 0 until sources.length) {
-            val src = sources.item(i) as Element
-            var videoUrl = src.textContent
-            val name = src.getAttribute("name")
-            val exp = src.getAttribute("exp")
-            if (hashValues != null && hashValues.getElementsByTagName("hash_value_$name").length > 0) {
-                val hash = hashValues.getElementsByTagName("hash_value_$name").item(0)?.textContent
-                videoUrl = updateUrl(videoUrl, mapOf("md5" to hash, "expires" to exp))
+            // Determine player URL
+            val playerUrl = if (url.contains("videa.hu/player")) {
+                url
+            } else {
+                Regex("<iframe.*?src=\\\"(/player\\?[^\\\"]+)\\\"")
+                    .find(pageContent)?.groupValues?.get(1)
+                    ?.let { url.substringBefore("/videa.hu") + it } ?: url
             }
-            callback(
-                newExtractorLink(
-                    source = name,
-                    name = title,
-                    url = fixUrl(videoUrl)
-            ) {
-                    this.referer = url
-                    this.quality = Qualities.Unknown.value
-                    this.type = ExtractorLinkType.VIDEO
-                }
+
+            // Download player page
+            val playerResp = app.get(playerUrl, referer = url)
+            val playerHtml = playerResp.text
+
+            // Extract nonce
+            val nonceMatch = Regex("_xt\\s*=\\s*\\\"([^\\\"]+)\\\"").find(playerHtml)
+            if (nonceMatch == null) {
+                Log.e("kraptor_$name", "Nonce not found in player HTML")
+                return@withContext
+            }
+            val nonce = nonceMatch.groupValues[1]
+            val l = nonce.substring(0, 32)
+            val s = nonce.substring(32)
+            var result = ""
+            for (i in 0 until 32) {
+                val idx = STATIC_SECRET.indexOf(l[i])
+                result += s[i - (idx - 31)]
+            }
+
+            // Build query parameters
+            val randomSeed = (1..8).map { ('A'..'Z') + ('a'..'z') + ('0'..'9') }
+                .joinToString("") { it[(0 until 62).random()].toString() }
+            val tParam = result.substring(0, 16)
+            val query = mapOf(
+                "v" to url.substringAfterLast("v="),
+                "_s" to randomSeed,
+                "_t" to tParam
             )
+
+            // Request XML info
+            val xmlResp = app.get("https://videa.hu/player/xml", referer = playerUrl, params = query)
+            val xmlBody = xmlResp.text
+
+            val xmlString = if (xmlBody.trimStart().startsWith("<?xml")) {
+                xmlBody
+            } else {
+                // Encrypted: base64 -> rc4
+                try {
+                    val b64 = Base64.decode(xmlBody, Base64.DEFAULT)
+                    val key = result.substring(16) + randomSeed + (xmlResp.headers["x-videa-xs"] ?: "")
+                    rc4(b64, key)
+                } catch (e: Exception) {
+                    Log.e("kraptor_$name", "Decryption failed: ${e.message}")
+                    ""
+                }
+            }
+
+            if (xmlString.isBlank() || !xmlString.contains("video")) {
+                Log.e("kraptor_$name", "Invalid XML response: $xmlString")
+                return@withContext
+            }
+
+            // Parse XML
+            val db = DocumentBuilderFactory.newInstance().newDocumentBuilder()
+            val doc = db.parse(xmlString.byteInputStream())
+            val videoTags = doc.getElementsByTagName("video")
+            if (videoTags.length == 0) {
+                Log.e("kraptor_$name", "No video tag found in XML")
+                return@withContext
+            }
+            val video = videoTags.item(0) as Element
+            val title = video.getElementsByTagName("title").item(0)?.textContent ?: "Videa Video"
+
+            val sources = doc.getElementsByTagName("video_source")
+            val hashValues = doc.getElementsByTagName("hash_values").item(0) as? Element
+
+            for (i in 0 until sources.length) {
+                val src = sources.item(i) as Element
+                var videoUrl = src.textContent
+                val srcName = src.getAttribute("name")
+                val exp = src.getAttribute("exp")
+                if (hashValues != null && hashValues.getElementsByTagName("hash_value_$srcName").length > 0) {
+                    val hash = hashValues.getElementsByTagName("hash_value_$srcName").item(0)?.textContent
+                    videoUrl = updateUrl(videoUrl, mapOf("md5" to hash, "expires" to exp))
+                }
+                callback(
+                    newExtractorLink(
+                        source = srcName,
+                        name = title,
+                        url = fixUrl(videoUrl)
+                    ) {
+                        this.referer = url
+                        this.quality = Qualities.Unknown.value
+                        this.type = ExtractorLinkType.VIDEO
+                    }
+                )
+            }
+        } catch (e: Exception) {
+            Log.e("kraptor_$name", "General error in getUrl: ${e.message}")
+            e.printStackTrace()
         }
     }
 
