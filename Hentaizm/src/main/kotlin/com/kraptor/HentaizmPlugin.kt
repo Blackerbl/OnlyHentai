@@ -8,8 +8,9 @@ import com.lagradost.cloudstream3.plugins.BasePlugin
 class HentaizmPlugin: BasePlugin() {
     override fun load() {
         android.util.Log.d("Hentaizm", "Plugin loading - v16")
-        registerMainAPI(Hentaizm())
-        registerExtractorAPI(Hentaizm().VideoHu())
+        val api = Hentaizm()
+        registerMainAPI(api)
+        registerExtractorAPI(api.videoHu)
         registerExtractorAPI(CloudMailRu())
         android.util.Log.d("Hentaizm", "Plugin loaded successfully")
     }

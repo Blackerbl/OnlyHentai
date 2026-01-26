@@ -40,6 +40,7 @@ class Hentaizm : MainAPI() {
     override var lang = "tr"
     override val hasQuickSearch = false
     override val supportedTypes = setOf(TvType.NSFW)
+    val videoHu = VideoHu()
 
     override fun getVideoInterceptor(extractorLink: ExtractorLink): Interceptor {
         return object : Interceptor {
