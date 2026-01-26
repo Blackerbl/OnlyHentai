@@ -83,6 +83,7 @@ open class VideoHu : ExtractorApi() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ) = withContext(Dispatchers.IO) {
+        Log.d("kraptor_$name", "Entering getUrl [v33] - URL: $url")
         try {
             Log.d("kraptor_$name", "Fetching URL: $url")
             // Download initial page or player
