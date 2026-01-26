@@ -1,10 +1,10 @@
 // ! Bu araç @Kraptor123 tarafından | @Cs-GizliKeyif için yazılmıştır.
-version = 12
+version = 13
 
 cloudstream {
     authors     = listOf("kraptor")
     language    = "tr"
-    description = "hentaizm, türkçe altyazılı hentai izle."
+    description = "Test 12"
 
     /**
      * Status int as the following:

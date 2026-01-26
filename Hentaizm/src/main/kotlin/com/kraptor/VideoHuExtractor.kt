@@ -92,12 +92,15 @@ open class VideoHu : ExtractorApi() {
             // Request XML info
             val xmlResp = app.get("https://videa.hu/player/xml", referer = playerUrl, params = query)
             val xmlBody = xmlResp.text
+            Log.d("kraptor_$name", "XML Response status: ${xmlResp.code}, body length: ${xmlBody.length}")
 
             val xmlString = if (xmlBody.trimStart().startsWith("<?xml")) {
+                Log.d("kraptor_$name", "XML is plain text")
                 xmlBody
             } else {
                 // Encrypted: base64 -> rc4
                 try {
+                    Log.d("kraptor_$name", "XML is encrypted, decrypting...")
                     val b64 = Base64.decode(xmlBody, Base64.DEFAULT)
                     val key = result.substring(16) + randomSeed + (xmlResp.headers["x-videa-xs"] ?: "")
                     rc4(b64, key)
@@ -107,7 +110,12 @@ open class VideoHu : ExtractorApi() {
                 }
             }
 
-            if (xmlString.isBlank() || !xmlString.contains("video")) {
+            if (xmlString.isBlank()) {
+                Log.e("kraptor_$name", "XML string is blank after processing")
+                return@withContext
+            }
+            
+            if (!xmlString.contains("video")) {
                 Log.e("kraptor_$name", "Invalid XML response (length=${xmlString.length}): ${xmlString.take(500)}")
                 return@withContext
             }
