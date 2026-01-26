@@ -108,7 +108,7 @@ open class VideoHu : ExtractorApi() {
             }
 
             if (xmlString.isBlank() || !xmlString.contains("video")) {
-                Log.e("kraptor_$name", "Invalid XML response: $xmlString")
+                Log.e("kraptor_$name", "Invalid XML response (length=${xmlString.length}): ${xmlString.take(500)}")
                 return@withContext
             }
 
