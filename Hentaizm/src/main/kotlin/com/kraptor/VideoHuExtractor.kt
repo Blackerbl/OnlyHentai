@@ -162,11 +162,12 @@ open class VideoHu : ExtractorApi() {
             val doc = db.parse(xmlString.byteInputStream())
             val videoTags = doc.getElementsByTagName("video")
             if (videoTags.length == 0) {
-                // Check for error tag with redirect URL
-                val errorTags = doc.getElementsByTagName("error")
-                if (errorTags.length > 0) {
-                    val errorUrl = errorTags.item(0).textContent
-                    Log.d("kraptor_$name", "Error tag found with URL: $errorUrl, trying web scraping fallback")
+                // Check for error tag with redirect URL using Regex (more robust than DOM)
+                // XML format: <error status="0" url="" panelstyle="noembed">https://...</error>
+                val errorMatch = Regex("<error[^>]*>(.*?)</error>").find(xmlString)
+                if (errorMatch != null) {
+                    val errorUrl = errorMatch.groupValues[1]
+                    Log.d("kraptor_$name", "Error tag found via Regex with URL: $errorUrl, trying web scraping fallback")
                     
                     if (errorUrl.isNotEmpty() && errorUrl.startsWith("http")) {
                         try {
@@ -190,7 +191,7 @@ open class VideoHu : ExtractorApi() {
                                 )
                                 return@withContext
                             } else {
-                                Log.e("kraptor_$name", "No video URL found in fallback page")
+                                Log.e("kraptor_$name", "No video URL found in fallback page source")
                             }
                         } catch (e: Exception) {
                             Log.e("kraptor_$name", "Error in fallback scraping: ${e.message}")
