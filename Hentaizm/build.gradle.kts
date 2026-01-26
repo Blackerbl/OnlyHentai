@@ -1,5 +1,5 @@
 // ! Bu araç @Kraptor123 tarafından | @Cs-GizliKeyif için yazılmıştır.
-version = 23
+version = 24
 
 cloudstream {
     authors     = listOf("kraptor")
@@ -16,4 +16,8 @@ cloudstream {
     status  = 1 // will be 3 if unspecified
     tvTypes = listOf("NSFW")
     iconUrl = "https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://www.hentaizm6.online/core/views/086f35f924/fav.ico&size=64"
+}
+
+dependencies {
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
 }
