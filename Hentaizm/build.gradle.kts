@@ -1,10 +1,10 @@
 // ! Bu araç @Kraptor123 tarafından | @Cs-GizliKeyif için yazılmıştır.
-version = 16
+version = 17
 
 cloudstream {
     authors     = listOf("kraptor")
     language    = "tr"
-    description = "Test 1"2""
+    description = "Anan""
 
     /**
      * Status int as the following:
