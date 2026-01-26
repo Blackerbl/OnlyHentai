@@ -1,4 +1,4 @@
-// ! Bu araç @Kraptor123 tarafından | @Cs-GizliKeyif için yazılmıştır. (Düzeltilmiş)
+// ! Bu araç @Kraptor123 tarafından | @Cs-GizliKeyif için yazılmıştır.
 package com.kraptor
 
 import android.annotation.SuppressLint
@@ -13,7 +13,7 @@ import kotlinx.coroutines.sync.withLock
 import okhttp3.Interceptor
 import okhttp3.Response
 import org.jsoup.Jsoup
-import kotlin.collections.mapOf
+import java.io.IOException
 
 private val cloudflareKiller by lazy { CloudflareKiller() }
 private val interceptor      by lazy { CloudflareInterceptor(cloudflareKiller) }
@@ -24,7 +24,8 @@ class CloudflareInterceptor(private val cloudflareKiller: CloudflareKiller): Int
         val response = chain.proceed(request)
         val doc      = Jsoup.parse(response.peekBody(1024 * 1024).string())
 
-        if (doc.html().contains("Just a moment")) {
+        if (doc.html().contains("Just a moment") || response.code == 403) {
+            response.close()
             return cloudflareKiller.intercept(chain)
         }
 
@@ -34,14 +35,30 @@ class CloudflareInterceptor(private val cloudflareKiller: CloudflareKiller): Int
 
 class Hentaizm : MainAPI() {
     override var mainUrl = "https://www.hentaizm6.online"
-    override var name = "TestHentaizm"
+    override var name = "Hentaizm"
     override val hasMainPage = true
     override var lang = "tr"
     override val hasQuickSearch = false
     override val supportedTypes = setOf(TvType.NSFW)
 
     override fun getVideoInterceptor(extractorLink: ExtractorLink): Interceptor {
-        return interceptor
+        return object : Interceptor {
+            override fun intercept(chain: Interceptor.Chain): Response {
+                val request = chain.request()
+                val cookies = SessionManager.getCachedCookies()
+                
+                val builder = request.newBuilder()
+                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                    .header("Referer", mainUrl + "/")
+
+                if (cookies.isNotEmpty()) {
+                    val cookieHeader = cookies.entries.joinToString("; ") { "${it.key}=${it.value}" }
+                    builder.header("Cookie", cookieHeader)
+                }
+
+                return chain.proceed(builder.build())
+            }
+        }
     }
 
     override val mainPage = mainPageOf(
@@ -116,6 +133,10 @@ class Hentaizm : MainAPI() {
         private var cachedCookies: Map<String, String>? = null
         private val loginMutex = Mutex()
 
+        fun getCachedCookies(): Map<String, String> {
+            return cachedCookies ?: emptyMap()
+        }
+
         suspend fun login(): Map<String, String> {
             cachedCookies?.let {
                 return it
@@ -129,7 +150,7 @@ class Hentaizm : MainAPI() {
                     "https://www.hentaizm6.online/giris",
                     data = mapOf(
                         "user" to "igtbyprzkxtigpoqbj@enotj.com",
-                        "pass" to "AU#@d4524\\$>yv#V",
+                        "pass" to "AU#@d4524\$>yv#V",
                         "redirect_to" to "https://www.hentaizm6.online"
                     )
                 ).cookies
@@ -139,6 +160,7 @@ class Hentaizm : MainAPI() {
             }
         }
     }
+
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val cookies = SessionManager.login()
@@ -162,7 +184,7 @@ class Hentaizm : MainAPI() {
 
     override suspend fun search(query: String, page: Int): SearchResponseList {
         val cookies = SessionManager.login()
-        val document = app.get("${mainUrl}/page/2?s=${query}", cookies = cookies).document
+        val document = app.get("${mainUrl}/page/$page?s=${query}", cookies = cookies).document
 
         val aramaCevap = document.select("div.moviefilm").mapNotNull { it.toSearchResult() }
         return newSearchResponseList(aramaCevap, hasNext = true)
@@ -190,7 +212,7 @@ class Hentaizm : MainAPI() {
         val poster = fixUrlNull(document.selectFirst("div.filmcontent img")?.attr("src"))
         val description =
             document.selectFirst("table.anime-detay > tbody:nth-child(1) > tr:nth-child(5) > td:nth-child(1)")?.text()
-                ?.trim()?.replace("\\\\","")
+                ?.trim()?.replace("\\","")
         val year =
             document.selectFirst("dıv.anime-detay > tbody:nth-child(1) > tr:nth-child(3) > td:nth-child(1) > b:nth-child(1)")
                 ?.text()?.trim()?.toIntOrNull()
@@ -234,37 +256,33 @@ class Hentaizm : MainAPI() {
         val anchors = document.select("div.filmicerik a")
 
         anchors.forEachIndexed { index, element ->
-            val url = if (index == 0) {
-                fixUrlNull(element.attr("href").substringAfter("url="))
-            } else {
-                val onclick = element.attr("onclick")
-                val rawUrl = onclick.substringAfter("ajxget('").substringBefore("'").replace("../../","")
-                val fixRaw = fixUrlNull(rawUrl).toString()
-                val rawGet = app.get(fixRaw, referer = "${mainUrl}/", cookies = cookies
-                ).document
-                val vidUrl = rawGet.selectFirst("a")?.attr("href")?.replace("../../","")
-               if (vidUrl.toString().contains("ay.live")) {
-                    vidUrl?.substringAfter("url=")
-                }
-               else
-                fixUrlNull(rawGet.selectFirst("iframe")?.attr("src"))
-            }
-
-            url?.let { iframe ->
-                val headers = mapOf("Cookie" to cookies.map { "${it.key}=${it.value}" }.joinToString("; "))
-                
-                if (iframe.contains("https://short.icu")) {
-                  val realIframe = app.get(iframe, allowRedirects = true, interceptor = interceptor, cookies = cookies).url
-                    loadExtractor(realIframe, "$mainUrl/", subtitleCallback) { link ->
-                        link.headers = link.headers + headers
-                        callback(link)
-                    }
+            try {
+                val url = if (index == 0) {
+                    fixUrlNull(element.attr("href").substringAfter("url="))
                 } else {
-                    loadExtractor(iframe, "$mainUrl/", subtitleCallback) { link ->
-                        link.headers = link.headers + headers
-                        callback(link)
+                    val onclick = element.attr("onclick")
+                    val rawUrl = onclick.substringAfter("ajxget('").substringBefore("'").replace("../../","")
+                    val fixRaw = fixUrlNull(rawUrl).toString()
+                    val rawGet = app.get(fixRaw, referer = data, cookies = cookies).document
+                    val vidUrl = rawGet.selectFirst("a")?.attr("href")?.replace("../../","")
+                    if (vidUrl?.contains("ay.live") == true) {
+                        vidUrl.substringAfter("url=")
+                    } else {
+                        fixUrlNull(rawGet.selectFirst("iframe")?.attr("src"))
                     }
                 }
+
+                url?.let { iframe ->
+                    val finalUrl = if (iframe.contains("short.icu") || iframe.contains("ay.live")) {
+                        val response = app.get(iframe, allowRedirects = true, interceptor = interceptor)
+                        response.url
+                    } else {
+                        iframe
+                    }
+                    loadExtractor(finalUrl, "$mainUrl/", subtitleCallback, callback)
+                }
+            } catch (e: Exception) {
+                Log.e("Hentaizm", "Error loading link at index $index: ${e.message}")
             }
         }
         return true
