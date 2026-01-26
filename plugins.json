@@ -1,0 +1,21 @@
+[
+    {
+        "url": "https://raw.githubusercontent.com/Blackerbl/OnlyHentai/builds/Hentaizm.cs3",
+        "status": 1,
+        "version": 3,
+        "name": "Hentaizm",
+        "internalName": "Hentaizm",
+        "authors": [
+            "kraptor"
+        ],
+        "description": "Test 1",
+        "fileSize": 33254,
+        "repositoryUrl": "https://github.com/Blackerbl/OnlyHentai",
+        "language": "tr",
+        "tvTypes": [
+            "NSFW"
+        ],
+        "iconUrl": "https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://www.hentaizm6.online/core/views/086f35f924/fav.ico&size=64",
+        "apiVersion": 1
+    }
+]
