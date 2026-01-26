@@ -125,7 +125,7 @@ open class VideoHu : ExtractorApi() {
             val doc = db.parse(xmlString.byteInputStream())
             val videoTags = doc.getElementsByTagName("video")
             if (videoTags.length == 0) {
-                Log.e("kraptor_$name", "No video tag found in XML")
+                Log.e("kraptor_$name", "No video tag found in XML. Content: ${xmlString.take(500)}")
                 return@withContext
             }
             val video = videoTags.item(0) as Element
