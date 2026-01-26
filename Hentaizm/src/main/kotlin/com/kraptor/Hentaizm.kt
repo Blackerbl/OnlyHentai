@@ -2,7 +2,7 @@
 package com.kraptor
 
 import android.annotation.SuppressLint
-import com.lagradost.api.Log
+import android.util.Log
 import org.jsoup.nodes.Element
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*

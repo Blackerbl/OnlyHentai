@@ -1,6 +1,6 @@
 package com.kraptor
 
-import com.lagradost.api.Log
+import android.util.Log
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import org.w3c.dom.Element
