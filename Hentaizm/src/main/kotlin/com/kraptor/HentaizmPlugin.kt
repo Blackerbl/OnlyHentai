@@ -9,7 +9,7 @@ class HentaizmPlugin: BasePlugin() {
     override fun load() {
         android.util.Log.d("Hentaizm", "Plugin loading - v16")
         registerMainAPI(Hentaizm())
-        registerExtractorAPI(VideoHu())
+        registerExtractorAPI(Hentaizm().VideoHu())
         registerExtractorAPI(CloudMailRu())
         android.util.Log.d("Hentaizm", "Plugin loaded successfully")
     }

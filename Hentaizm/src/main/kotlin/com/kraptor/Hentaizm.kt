@@ -287,4 +287,189 @@ class Hentaizm : MainAPI() {
         }
         return true
     }
+    }
+
+    inner class VideoHu : ExtractorApi() {
+        override val name = "Videa"
+        override val mainUrl = "https://videa.hu"
+        override val requiresReferer = false
+
+        // RC4 decryption helpers
+        private fun rc4(cipher: ByteArray, key: String): String {
+            val S = ByteArray(256) { it.toByte() }
+            val K = key.toByteArray(Charsets.UTF_8)
+            var j = 0
+            for (i in 0 until 256) {
+                j = (j + S[i] + K[i % K.size]) and 0xFF
+                S[i] = S[j].also { S[j] = S[i] }
+            }
+            val result = ByteArray(cipher.size)
+            var i = 0
+            j = 0
+            for (n in cipher.indices) {
+                i = (i + 1) and 0xFF
+                j = (j + S[i]) and 0xFF
+                S[i] = S[j].also { S[j] = S[i] }
+                val Kbyte = S[(S[i] + S[j]) and 0xFF]
+                result[n] = (cipher[n].toInt() xor Kbyte.toInt()).toByte()
+            }
+            return result.toString(Charsets.UTF_8)
+        }
+
+        override suspend fun getUrl(
+            url: String,
+            referer: String?,
+            subtitleCallback: (SubtitleFile) -> Unit,
+            callback: (ExtractorLink) -> Unit
+        ) {
+            try {
+                Log.d("kraptor_Videa", "Fetching URL: $url")
+                // Download initial page or player
+                val pageContent = app.get(url, referer = referer).text
+
+                // Determine player URL
+                val playerUrl = if (url.contains("videa.hu/player")) {
+                    url
+                } else {
+                    Regex("<iframe.*?src=\\\"(/player\\?[^\\\"]+)\\\"")
+                        .find(pageContent)?.groupValues?.get(1)
+                        ?.let { url.substringBefore("/videa.hu") + it } ?: url
+                }
+
+                // Download player page
+                val playerResp = app.get(playerUrl, referer = url)
+                val playerHtml = playerResp.text
+
+                // Extract nonce
+                val nonceMatch = Regex("_xt\\s*=\\s*\\\"([^\\\"]+)\\\"").find(playerHtml)
+                if (nonceMatch == null) {
+                    Log.e("kraptor_Videa", "Nonce not found in player HTML")
+                    return
+                }
+                val nonce = nonceMatch.groupValues[1]
+                val l = nonce.substring(0, 32)
+                val s = nonce.substring(32)
+                var result = ""
+                val STATIC_SECRET = "xHb0ZvME5q8CBcoQi6AngerDu3FGO9fkUlwPmLVY_RTzj2hJIS4NasXWKy1td7p"
+                for (i in 0 until 32) {
+                    val idx = STATIC_SECRET.indexOf(l[i])
+                    result += s[i - (idx - 31)]
+                }
+
+                // Build query parameters
+                val randomSeed = (1..8).map { ('A'..'Z') + ('a'..'z') + ('0'..'9') }
+                    .joinToString("") { it[(0 until 62).random()].toString() }
+                val tParam = result.substring(0, 16)
+                val query = mapOf(
+                    "v" to url.substringAfterLast("v="),
+                    "_s" to randomSeed,
+                    "_t" to tParam
+                )
+
+                // Request XML info
+                val xmlResp = app.get("https://videa.hu/player/xml", referer = playerUrl, params = query)
+                val xmlBody = xmlResp.text
+                Log.d("kraptor_Videa", "XML Response status: ${xmlResp.code}, body length: ${xmlBody.length}")
+
+                val xmlString = if (xmlBody.trimStart().startsWith("<?xml")) {
+                    Log.d("kraptor_Videa", "XML is plain text")
+                    xmlBody
+                } else {
+                    // Encrypted: base64 -> rc4
+                    try {
+                        Log.d("kraptor_Videa", "XML is encrypted, decrypting...")
+                        val b64 = android.util.Base64.decode(xmlBody, android.util.Base64.DEFAULT)
+                        val key = result.substring(16) + randomSeed + (xmlResp.headers["x-videa-xs"] ?: "")
+                        rc4(b64, key)
+                    } catch (e: Exception) {
+                        Log.e("kraptor_Videa", "Decryption failed: ${e.message}")
+                        ""
+                    }
+                }
+
+                if (xmlString.isBlank()) {
+                    Log.e("kraptor_Videa", "XML string is blank after processing")
+                    return
+                }
+                
+                // Log XML for debugging
+                Log.d("kraptor_Videa", "Received XML (${xmlString.length} chars): ${xmlString.take(500)}")
+
+                // Parse XML
+                val db = javax.xml.parsers.DocumentBuilderFactory.newInstance().newDocumentBuilder()
+                val doc = db.parse(xmlString.byteInputStream())
+                val videoTags = doc.getElementsByTagName("video")
+                if (videoTags.length == 0) {
+                     // Check for error tag with redirect URL
+                    val errorTags = doc.getElementsByTagName("error")
+                    if (errorTags.length > 0) {
+                        val errorUrl = errorTags.item(0).textContent
+                        Log.d("kraptor_Videa", "Error tag found with URL: $errorUrl, trying web scraping fallback")
+                        
+                        if (errorUrl.isNotEmpty() && errorUrl.startsWith("http")) {
+                            try {
+                                val pageHtml = app.get(errorUrl).text
+                                // Try to find video URL in page source
+                                val mp4Match = Regex("""\"file\"\s*:\s*\"(https?:.*?.mp4)\"""").find(pageHtml)
+                                if (mp4Match != null) {
+                                    val videoUrl = mp4Match.groupValues[1].replace("\\/", "/")
+                                    Log.d("kraptor_Videa", "Found fallback video URL: $videoUrl")
+                                    callback.invoke(
+                                        ExtractorLink(
+                                            name,
+                                            name,
+                                            videoUrl,
+                                            referer = errorUrl,
+                                            quality = Qualities.Unknown.value,
+                                            type = INFER_TYPE
+                                        )
+                                    )
+                                    return
+                                } else {
+                                    Log.e("kraptor_Videa", "No video URL found in fallback page")
+                                }
+                            } catch (e: Exception) {
+                                Log.e("kraptor_Videa", "Error in fallback scraping: ${e.message}")
+                            }
+                        }
+                    }
+                    Log.e("kraptor_Videa", "No video tag found in XML")
+                    return
+                }
+                val video = videoTags.item(0) as org.w3c.dom.Element
+                val title = video.getElementsByTagName("title").item(0)?.textContent ?: "Videa Video"
+
+                val sources = doc.getElementsByTagName("video_source")
+                val hashValues = doc.getElementsByTagName("hash_values").item(0) as? org.w3c.dom.Element
+
+                for (i in 0 until sources.length) {
+                    val src = sources.item(i) as org.w3c.dom.Element
+                    var videoUrl = src.textContent
+                    val srcName = src.getAttribute("name")
+                    val exp = src.getAttribute("exp")
+                    if (hashValues != null && hashValues.getElementsByTagName("hash_value_$srcName").length > 0) {
+                        val hash = hashValues.getElementsByTagName("hash_value_$srcName").item(0)?.textContent
+                        videoUrl = updateUrl(videoUrl, mapOf("md5" to hash, "expires" to exp))
+                    }
+                    callback(
+                        newExtractorLink(
+                            source = srcName,
+                            name = title,
+                            url = if (videoUrl.startsWith("//")) "https:$videoUrl" else videoUrl
+                        ) {
+                            this.referer = url
+                            this.quality = Qualities.Unknown.value
+                            this.type = ExtractorLinkType.VIDEO
+                        }
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e("kraptor_Videa", "General error in getUrl: ${e.message}")
+                e.printStackTrace()
+            }
+        }
+        
+        private fun updateUrl(url: String, params: Map<String, String?>): String =
+            url + params.entries.joinToString("&", prefix = if (url.contains("?")) "&" else "?") { "${it.key}=${it.value}" }
+    }
 }
