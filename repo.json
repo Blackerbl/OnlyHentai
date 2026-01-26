@@ -1,9 +1,1 @@
-{
-  "iconUrl": null,
-  "name": "OnlyHentai | @Blackerbl",
-  "description": "Fixed Hentaizm Repo",
-  "manifestVersion": 1,
-  "pluginLists": [
-    "https://raw.githubusercontent.com/Blackerbl/OnlyHentai/builds/plugins.json"
-  ]
-}
+{"pluginLists":["https://raw.githubusercontent.com/Blackerbl/OnlyHentai/refs/heads/builds/plugins.json"],"description":"Fixed Hentaizm Repo","name":"OnlyHentai | @Blackerbl","manifestVersion":1,"iconUrl":null}
