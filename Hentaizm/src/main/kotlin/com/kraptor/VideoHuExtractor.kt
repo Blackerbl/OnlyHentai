@@ -176,8 +176,8 @@ open class VideoHu : ExtractorApi() {
                             val fbResp = httpGet(errorUrl)
                             val pageHtml = fbResp.text
                             // Try to find video URL in page source (Videa usually keeps it in JSON config in script)
-                            // Look for "file": "https://..."
-                            val mp4Match = Regex("""\"file\"\s*:\s*\"(https?:.*?.mp4)\"""").find(pageHtml)
+                            // Look for "file": "https://..." (capture anything inside quotes)
+                            val mp4Match = Regex("""\"file\"\s*:\s*\"(https?:[^\"]+)\"""").find(pageHtml)
                             if (mp4Match != null) {
                                 val videoUrl = mp4Match.groupValues[1].replace("\\/", "/")
                                 Log.d("kraptor_$name", "Found fallback video URL: $videoUrl")
