@@ -183,14 +183,14 @@ open class VideoHu : ExtractorApi() {
                                 val videoUrl = mp4Match.groupValues[1].replace("\\/", "/")
                                 Log.d("kraptor_$name", "Found fallback video URL: $videoUrl")
                                 callback.invoke(
-                                    ExtractorLink(
-                                        name,
-                                        name,
-                                        videoUrl,
-                                        referer = errorUrl,
-                                        quality = Qualities.Unknown.value,
-                                        type = INFER_TYPE
-                                    )
+                                    newExtractorLink(
+                                        source = name,
+                                        name = name,
+                                        url = videoUrl
+                                    ) {
+                                        referer = errorUrl
+                                        quality = Qualities.Unknown.value
+                                    }
                                 )
                                 return@withContext
                             } else {
