@@ -162,14 +162,19 @@ open class VideoHu : ExtractorApi() {
             val doc = db.parse(xmlString.byteInputStream())
             val videoTags = doc.getElementsByTagName("video")
             if (videoTags.length == 0) {
-                // Check for error tag with redirect URL using Regex (more robust than DOM)
+                // Check for error tag with redirect URL using manual parsing (Most robust)
                 // XML format: <error status="0" url="" panelstyle="noembed">https://...</error>
-                val errorMatch = Regex("<error[^>]*>(.*?)</error>").find(xmlString)
-                if (errorMatch != null) {
-                    val errorUrl = errorMatch.groupValues[1]
-                    Log.d("kraptor_$name", "Error tag found via Regex with URL: $errorUrl, trying web scraping fallback")
-                    
-                    if (errorUrl.isNotEmpty() && errorUrl.startsWith("http")) {
+                val errorTagStart = xmlString.indexOf("<error")
+                val errorTagEnd = xmlString.indexOf("</error>")
+                
+                if (errorTagStart != -1 && errorTagEnd != -1 && errorTagEnd > errorTagStart) {
+                     // Find the closing bracket of opening tag
+                     val openingTagEnd = xmlString.indexOf(">", errorTagStart)
+                     if (openingTagEnd != -1 && openingTagEnd < errorTagEnd) {
+                         val errorUrl = xmlString.substring(openingTagEnd + 1, errorTagEnd).trim()
+                         Log.d("kraptor_$name", "Error tag found via Stringop with URL: $errorUrl, trying web scraping fallback")
+
+                         if (errorUrl.isNotEmpty() && errorUrl.startsWith("http")) {
                         try {
                             val fbResp = httpGet(errorUrl)
                             val pageHtml = fbResp.text
