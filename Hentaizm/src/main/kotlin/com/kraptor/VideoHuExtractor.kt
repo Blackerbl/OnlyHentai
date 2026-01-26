@@ -187,10 +187,10 @@ open class VideoHu : ExtractorApi() {
                                         source = name,
                                         name = name,
                                         url = videoUrl
-                                    ) {
-                                        referer = errorUrl
+                                    ).copy(
+                                        referer = errorUrl,
                                         quality = Qualities.Unknown.value
-                                    }
+                                    )
                                 )
                                 return@withContext
                             } else {
@@ -225,11 +225,11 @@ open class VideoHu : ExtractorApi() {
                         source = srcName,
                         name = title,
                         url = fixUrl(videoUrl)
-                    ) {
-                        this.referer = url
-                        this.quality = Qualities.Unknown.value
-                        this.type = ExtractorLinkType.VIDEO
-                    }
+                    ).copy(
+                        referer = url,
+                        quality = Qualities.Unknown.value,
+                        type = ExtractorLinkType.VIDEO
+                    )
                 )
             }
         } catch (e: Exception) {
