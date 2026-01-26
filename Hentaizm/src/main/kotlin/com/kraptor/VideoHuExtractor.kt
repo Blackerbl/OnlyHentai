@@ -8,27 +8,46 @@ import javax.xml.parsers.DocumentBuilderFactory
 import android.util.Base64
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
-import okhttp3.Request
+import java.net.HttpURLConnection
+import java.net.URL
 
 open class VideoHu : ExtractorApi() {
     override val name = "Videa"
     override val mainUrl = "https://videa.hu"
     override val requiresReferer = false
 
-    // Initialize simple OkHttpClient
-    private val client = OkHttpClient.Builder()
-        .followRedirects(true)
-        .build()
+    data class VideoHuResponse(val text: String, val code: Int, val xVideaXs: String?)
 
-    // Helper for HTTP GET
-    private fun get(url: String, referer: String? = null): String {
-        val builder = Request.Builder().url(url)
-            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-        referer?.let { builder.header("Referer", it) }
+    // Helper for HTTP GET using HttpURLConnection
+    private fun httpGet(url: String, referer: String? = null, headers: Map<String, String> = emptyMap()): VideoHuResponse {
+        val connection = URL(url).openConnection() as HttpURLConnection
+        connection.requestMethod = "GET"
+        connection.instanceFollowRedirects = true
+        connection.connectTimeout = 15000
+        connection.readTimeout = 15000
         
-        return client.newCall(builder.build()).execute().use { response ->
-            response.body?.string() ?: ""
+        connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+        referer?.let { connection.setRequestProperty("Referer", it) }
+        headers.forEach { (k, v) -> connection.setRequestProperty(k, v) }
+        
+        try {
+            connection.connect()
+            val responseCode = connection.responseCode
+            val text = if (responseCode in 200..299) {
+                connection.inputStream.bufferedReader().use { it.readText() }
+            } else {
+                ""
+            }
+            
+            // Extract specific header
+            val xVideaXs = connection.getHeaderField("x-videa-xs")
+            
+            return VideoHuResponse(text, responseCode, xVideaXs)
+        } catch (e: Exception) {
+            Log.e("kraptor_$name", "HTTP Error: ${e.message}")
+            return VideoHuResponse("", 0, null)
+        } finally {
+            connection.disconnect()
         }
     }
 
@@ -67,7 +86,8 @@ open class VideoHu : ExtractorApi() {
         try {
             Log.d("kraptor_$name", "Fetching URL: $url")
             // Download initial page or player
-            val pageContent = get(url, referer = referer)
+            val pageResp = httpGet(url, referer = referer)
+            val pageContent = pageResp.text
 
             // Determine player URL
             val playerUrl = if (url.contains("videa.hu/player")) {
@@ -79,7 +99,8 @@ open class VideoHu : ExtractorApi() {
             }
 
             // Download player page
-            val playerHtml = get(playerUrl, referer = url)
+            val playerResp = httpGet(playerUrl, referer = url)
+            val playerHtml = playerResp.text
 
             // Extract nonce
             val nonceMatch = Regex("_xt\\s*=\\s*\\\"([^\\\"]+)\\\"").find(playerHtml)
@@ -101,22 +122,14 @@ open class VideoHu : ExtractorApi() {
                 .joinToString("") { it[(0 until 62).random()].toString() }
             val tParam = result.substring(0, 16)
             
-            // For params, we need to construct URL manually since OkHttp doesn't have params map builder like NiceHttp
             val baseXmlUrl = "https://videa.hu/player/xml"
             val vParam = url.substringAfterLast("v=")
             val queryUrl = "$baseXmlUrl?v=$vParam&_s=$randomSeed&_t=$tParam"
 
             // Request XML info
-            // Need headers for headers["x-videa-xs"]
-            val xmlReq = Request.Builder().url(queryUrl)
-                .header("Referer", playerUrl)
-                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-                .build()
-                
-            val xmlResp = client.newCall(xmlReq).execute()
-            val xmlBody = xmlResp.body?.string() ?: ""
-            val xVideaXs = xmlResp.header("x-videa-xs") ?: ""
-            xmlResp.close()
+            val xmlResp = httpGet(queryUrl, referer = playerUrl)
+            val xmlBody = xmlResp.text
+            val xVideaXs = xmlResp.xVideaXs ?: ""
             
             Log.d("kraptor_$name", "XML Response status: ${xmlResp.code}, body length: ${xmlBody.length}")
 
@@ -157,7 +170,8 @@ open class VideoHu : ExtractorApi() {
                     
                     if (errorUrl.isNotEmpty() && errorUrl.startsWith("http")) {
                         try {
-                            val pageHtml = get(errorUrl)
+                            val fbResp = httpGet(errorUrl)
+                            val pageHtml = fbResp.text
                             // Try to find video URL in page source (Videa usually keeps it in JSON config in script)
                             // Look for "file": "https://..."
                             val mp4Match = Regex("""\"file\"\s*:\s*\"(https?:.*?.mp4)\"""").find(pageHtml)
