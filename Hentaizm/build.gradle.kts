@@ -1,10 +1,10 @@
 // ! Bu araç @Kraptor123 tarafından | @Cs-GizliKeyif için yazılmıştır.
-version = 17
+version = 18
 
 cloudstream {
     authors     = listOf("kraptor")
     language    = "tr"
-    description = "Anan""
+    description = "hentaizm, türkçe altyazılı hentai izle."
 
     /**
      * Status int as the following:
