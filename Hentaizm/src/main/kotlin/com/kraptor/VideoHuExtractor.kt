@@ -155,7 +155,9 @@ open class VideoHu : ExtractorApi() {
                 // --- FALLBACK LOGIC BİTİŞİ ---
 
                 val video = videoTags.item(0) as Element
-                val title = video.getElementsByTagName("title").item(0)?.textContent ?: "Videa Video"
+                val rawTitle = video.getElementsByTagName("title").item(0)?.textContent ?: "Videa Video"
+                // Sanitize title for file system
+                val title = rawTitle.replace(Regex("[/\\\\:*?\"<>|]"), "_")
 
                 val sources = doc.getElementsByTagName("video_source")
                 val hashValues = doc.getElementsByTagName("hash_values").item(0) as? Element
