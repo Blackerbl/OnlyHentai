@@ -133,7 +133,9 @@ open class VideoHu : ExtractorApi() {
                                 
                                 val titleMatch = Regex("<title>(.*?)</title>").find(pageHtml)
                                 val rawTitle = titleMatch?.groupValues?.get(1)?.substringBefore(" - Videa") ?: "Videa Video"
-                                val title = rawTitle.replace(Regex("[/\\\\:*?\"<>|]"), "_")
+                                // Strict sanitization: Allow only alphanumeric, space, dot, underscore, dash.
+                                // Also trim and limit length to 100 chars to prevent FS issues.
+                                val title = rawTitle.replace(Regex("[^\\w\\s.\\-_]"), "").trim().take(100)
 
                                 val mp4Match = Regex("""\"file\"\s*:\s*\"(https?:[^\"]+)\"""").find(pageHtml)
                                 if (mp4Match != null) {
@@ -161,8 +163,9 @@ open class VideoHu : ExtractorApi() {
 
                 val video = videoTags.item(0) as Element
                 val rawTitle = video.getElementsByTagName("title").item(0)?.textContent ?: "Videa Video"
-                // Sanitize title for file system
-                val title = rawTitle.replace(Regex("[/\\\\:*?\"<>|]"), "_")
+                // Strict sanitization: Allow only alphanumeric, space, dot, underscore, dash.
+                // Also trim and limit length to 100 chars to prevent FS issues.
+                val title = rawTitle.replace(Regex("[^\\w\\s.\\-_]"), "").trim().take(100)
 
                 val sources = doc.getElementsByTagName("video_source")
                 val hashValues = doc.getElementsByTagName("hash_values").item(0) as? Element
