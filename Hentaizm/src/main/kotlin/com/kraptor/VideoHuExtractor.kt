@@ -130,13 +130,18 @@ open class VideoHu : ExtractorApi() {
                             try {
                                 val fbResp = app.get(errorUrl)
                                 val pageHtml = fbResp.text
+                                
+                                val titleMatch = Regex("<title>(.*?)</title>").find(pageHtml)
+                                val rawTitle = titleMatch?.groupValues?.get(1)?.substringBefore(" - Videa") ?: "Videa Video"
+                                val title = rawTitle.replace(Regex("[/\\\\:*?\"<>|]"), "_")
+
                                 val mp4Match = Regex("""\"file\"\s*:\s*\"(https?:[^\"]+)\"""").find(pageHtml)
                                 if (mp4Match != null) {
                                     val videoUrl = mp4Match.groupValues[1].replace("\\/", "/")
                                     callback(
                                         newExtractorLink(
                                             source = name,
-                                            name = name,
+                                            name = title,
                                             url = videoUrl
                                         ) {
                                             this.referer = errorUrl
