@@ -1,5 +1,5 @@
 ﻿// ! Bu araÃ§ @Kraptor123 tarafÄ±ndan | @Cs-GizliKeyif iÃ§in yazÄ±lmÄ±ÅŸtÄ±r.
-version = 2
+version = 3
 
 cloudstream {
     authors     = listOf("kraptor")
@@ -17,3 +17,4 @@ cloudstream {
     tvTypes = listOf("NSFW")
     iconUrl = "https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://www.hentaizm6.online/core/views/086f35f924/fav.ico&size=64"
 }
+

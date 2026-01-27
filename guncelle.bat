@@ -4,7 +4,15 @@ echo ----------------------------------------
 git status
 echo ----------------------------------------
 echo.
+echo Proje derleniyor (Build)...
+call gradlew.bat make
+if %errorlevel% neq 0 (
+    echo [HATA] Derleme basarisiz oldu! Islemler iptal edildi.
+    pause
+    exit /b %errorlevel%
+)
 
+echo.
 echo Versiyon guncelleniyor...
 powershell -Command "$file = 'Hentaizm/build.gradle.kts'; if (Test-Path $file) { $content = Get-Content $file -Raw; if ($content -match 'version\s*=\s*(\d+)') { $currentVersion = [int]$matches[1]; $newVersion = $currentVersion + 1; $newContent = $content -replace 'version\s*=\s*\d+', ('version = ' + $newVersion); Set-Content $file $newContent -Encoding UTF8; Write-Host ('Versiyon ' + $currentVersion + ' -> ' + $newVersion + ' olarak guncellendi.'); } else { Write-Warning 'Versiyon tanimi bulunamadi!'; } } else { Write-Error 'build.gradle.kts bulunamadi!'; }"
 
